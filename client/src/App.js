@@ -3,13 +3,24 @@ import "./App.css";
 import io from "socket.io-client";
 import Peer from "simple-peer";
 import styled from "styled-components";
-
-const Container = styled.div`
-	height: 100vh;
-	width: 100%;
-	display: flex;
-	flex-direction: column;
-`;
+import {
+	Grid,
+	Box,
+	Button,
+	Paper,
+	InputBase,
+	IconButton,
+	Card,
+	Divider,
+	CardContent,
+	CardHeader,
+	Chip,
+} from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
+import CallIcon from "@material-ui/icons/Call";
+import VideoCallIcon from "@material-ui/icons/VideoCall";
+import PermIdentityIcon from "@material-ui/icons/PermIdentity";
+import { useSnackbar } from "notistack";
 
 const Row = styled.div`
 	display: flex;
@@ -22,6 +33,31 @@ const Video = styled.video`
 	height: 50%;
 `;
 
+const useStyles = makeStyles((theme) => ({
+	root: {
+		height: "100%",
+		display: "flex",
+		flexDirection: "column",
+		flexGrow: 1,
+	},
+	"id-overlay": {
+		position: "fixed",
+		height: "100%",
+		width: "100%",
+		display: "flex",
+		flexDirection: "column",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	input: {
+		marginLeft: theme.spacing(1),
+		flex: 1,
+	},
+	iconButton: {
+		padding: 10,
+	},
+}));
+
 function App() {
 	const [yourID, setYourID] = useState("");
 	const [users, setUsers] = useState({});
@@ -30,7 +66,10 @@ function App() {
 	const [caller, setCaller] = useState("");
 	const [callerSignal, setCallerSignal] = useState();
 	const [callAccepted, setCallAccepted] = useState(false);
+	const { enqueueSnackbar } = useSnackbar();
+	const [inpId, setinpId] = React.useState("");
 
+	const classes = useStyles();
 	const userVideo = useRef();
 	const partnerVideo = useRef();
 	const socket = useRef();
@@ -61,6 +100,11 @@ function App() {
 	}, []);
 
 	function callPeer(id) {
+		if (id === null || id === undefined || id === "") return;
+		if (id === yourID || !(id in users)) {
+			enqueueSnackbar("Please enter a valid id", { variant: "error" });
+			return;
+		}
 		const peer = new Peer({
 			initiator: true,
 			trickle: false,
@@ -101,12 +145,37 @@ function App() {
 
 	let UserVideo;
 	if (stream) {
-		UserVideo = <Video playsInline muted ref={userVideo} autoPlay />;
+		UserVideo = (
+			<Video
+				playsInline
+				muted
+				ref={userVideo}
+				autoPlay
+				style={{
+					width: "20%",
+					height: "20%",
+					border: "none",
+					position: "absolute",
+					top: "10px",
+					left: "10px",
+				}}
+			/>
+		);
 	}
 
 	let PartnerVideo;
 	if (callAccepted) {
-		PartnerVideo = <Video playsInline ref={partnerVideo} autoPlay />;
+		PartnerVideo = (
+			<Video
+				playsInline
+				ref={partnerVideo}
+				autoPlay
+				style={{
+					width: "100%",
+					border: "none",
+				}}
+			/>
+		);
 	}
 
 	let incomingCall;
@@ -118,26 +187,96 @@ function App() {
 			</div>
 		);
 	}
+
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		callPeer(inpId);
+		setinpId("");
+	};
+
+	const copyId = () => {
+		navigator.clipboard.writeText(yourID).then(() => {
+			enqueueSnackbar("Copied");
+		});
+	};
+
 	return (
-		<Container>
-			<Row>
-				{UserVideo}
-				{PartnerVideo}
-			</Row>
-			<Row>
-				{Object.keys(users).map((key) => {
-					if (key === yourID) {
-						return null;
-					}
-					return (
-						<button key={key} onClick={() => callPeer(key)}>
-							Call {key}
-						</button>
-					);
-				})}
-			</Row>
-			<Row>{incomingCall}</Row>
-		</Container>
+		<>
+			<div className={classes.root}>
+				<Grid container>
+					<Grid item xs={7}>
+						<Box display="flex" flexDirection="column" position="relative">
+							{PartnerVideo}
+							{UserVideo}
+						</Box>
+					</Grid>
+				</Grid>
+				<div className={classes["id-overlay"]}>
+					<Card style={{ padding: "24px" }} elevation={5}>
+						<CardHeader
+							title={
+								<>
+									<IconButton
+										type="submit"
+										className={classes.iconButton}
+										aria-label="search"
+									>
+										<VideoCallIcon />
+									</IconButton>
+									p2p video chat
+								</>
+							}
+						></CardHeader>
+						<CardContent>
+							<Paper component="form" elevation={0} onSubmit={handleSubmit}>
+								<IconButton
+									type="submit"
+									className={classes.iconButton}
+									aria-label="search"
+								>
+									<PermIdentityIcon />
+								</IconButton>
+								<InputBase
+									value={inpId}
+									onChange={(e) => {
+										setinpId(e.target.value);
+									}}
+									className={classes.input}
+									placeholder="Enter unique id to call"
+									inputProps={{ "aria-label": "Enter unique id to call" }}
+								/>
+								<Button
+									className={classes.input}
+									variant="contained"
+									color="primary"
+									type="submit"
+									startIcon={<CallIcon />}
+								>
+									Call
+								</Button>
+							</Paper>
+						</CardContent>
+						<Divider />
+						<br />
+						<span style={{ color: "#000000aa" }}>
+							Share your id with your friend to connect
+						</span>
+						<div style={{ dislpay: "flex", marginTop: "8px" }}>
+							<span
+								style={{
+									fontSize: "1.2rem",
+									marginRight: "8px",
+								}}
+							>
+								Your id: <em>{yourID}</em>
+							</span>
+							<Chip label="copy" variant="outlined" onClick={copyId} />
+						</div>
+					</Card>
+				</div>
+				<Row>{incomingCall}</Row>
+			</div>
+		</>
 	);
 }
 
