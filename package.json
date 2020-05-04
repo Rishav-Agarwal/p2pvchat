@@ -5,7 +5,8 @@
 	"license": "MIT",
 	"scripts": {
 		"heroku-prebuild": "yarn && cd client && yarn",
-		"build": "cd client && yarn build"
+		"build": "cd client && yarn build",
+		"start": "node server.js"
 	},
 	"dependencies": {
 		"express": "^4.17.1",
