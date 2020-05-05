@@ -28,6 +28,19 @@ io.on("connection", (socket) => {
 	socket.on("acceptCall", (data) => {
 		io.to(data.to).emit("callAccepted", data.signal);
 	});
+
+	socket.on("declineCall", (data) => {
+		io.to(data.to).emit("callDeclined");
+	});
+
+	socket.on("cancelCall", (data) => {
+		io.to(data.to).emit("callCancelled");
+	});
+
+	socket.on("endCall", (data) => {
+		io.to(data.to[0]).emit("callEnded");
+		io.to(data.to[1]).emit("callEnded");
+	});
 });
 
 if (process.env.NODE_ENV === "production") {
