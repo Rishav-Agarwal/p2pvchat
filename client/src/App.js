@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useReducer } from "react";
 import "./App.css";
 import io from "socket.io-client";
 import Peer from "simple-peer";
@@ -17,6 +17,10 @@ import {
 	Chip,
 	Backdrop,
 	Fab,
+	List,
+	ListItem,
+	Icon,
+	ListItemText,
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
 import CallIcon from "@material-ui/icons/Call";
@@ -60,6 +64,13 @@ const useStyles = makeStyles((theme) => ({
 	button: {
 		margin: theme.spacing(1),
 	},
+	fabEnd: {
+		display: "none",
+		[theme.breakpoints.up("md")]: {
+			marginLeft: "8px",
+			display: "block",
+		},
+	},
 }));
 
 function App() {
@@ -73,12 +84,17 @@ function App() {
 	const [callerSignal, setCallerSignal] = useState(null);
 	const [callAccepted, setCallAccepted] = useState(false);
 	const { enqueueSnackbar } = useSnackbar();
-	const [inpId, setinpId] = React.useState("");
+	const [inpId, setinpId] = useState("");
+	const [inpMsg, setinpMsg] = useState("");
+	const [messages, setMessages] = useReducer((messages, { value }) => {
+		return [...messages, value];
+	}, []);
 
 	const classes = useStyles();
 	const userVideo = useRef();
 	const partnerVideo = useRef();
 	const socket = useRef();
+	const messagesDiv = useRef(null);
 
 	useEffect(() => {
 		socket.current = io.connect("/");
@@ -94,6 +110,10 @@ function App() {
 			setReceivingCall(true);
 			setCaller(data.from);
 			setCallerSignal(data.signal);
+		});
+
+		socket.current.on("message", (data) => {
+			setMessages({ value: data });
 		});
 	}, []);
 
@@ -168,11 +188,6 @@ function App() {
 					setCaller("");
 					setCallerSignal(null);
 				});
-
-				socket.current.on("callEnded", () => {
-					peer.removeStream(stream);
-					resetConnection(stream);
-				});
 			})
 			.catch((err) => {
 				enqueueSnackbar("Cannot place call", { variant: "error" });
@@ -193,14 +208,11 @@ function App() {
 				peer.on("signal", (data) => {
 					socket.current.emit("acceptCall", { signal: data, to: caller });
 				});
+
 				peer.on("stream", (stream) => {
 					partnerVideo.current.srcObject = stream;
 				});
 
-				socket.current.on("callEnded", () => {
-					peer.removeStream(stream);
-					resetConnection(stream);
-				});
 				peer.signal(callerSignal);
 			})
 			.catch((err) => {
@@ -256,10 +268,24 @@ function App() {
 		});
 	};
 
+	const onSendMessage = (e) => {
+		const messageToSend = inpMsg;
+		const data = {
+			to: caller !== "" ? caller : callee,
+			message: messageToSend,
+		};
+		setinpMsg("");
+		setMessages({ value: data.message });
+		socket.current.emit("message", data);
+	};
+
 	return (
 		<>
-			<Grid container>
-				<Grid item xs={7}>
+			<Grid
+				container
+				style={{ display: callAccepted ? "flex" : "none", height: "100%" }}
+			>
+				<Grid item xs={12} sm={7} style={{ maxHeight: "100vh" }}>
 					<Box display="flex" flexDirection="column" position="relative">
 						{PartnerVideo}
 						{UserVideo}
@@ -269,17 +295,85 @@ function App() {
 								color="secondary"
 								style={{ position: "relative", left: "-50%" }}
 								onClick={() => {
-									socket.current.emit("endCall", {
-										to: [yourID, caller !== "" ? caller : callee],
-									});
-
 									resetConnection(stream);
 								}}
 							>
-								<CallEndIcon style={{ marginRight: "8px" }} />
-								End
+								<CallEndIcon />
+								<span className={classes.fabEnd}>End</span>
 							</Fab>
 						</div>
+					</Box>
+				</Grid>
+				<Grid item xs={12} sm={5}>
+					<Box
+						display="flex"
+						flexDirection="column"
+						position="relative"
+						paddingLeft="8px"
+						height="100%"
+					>
+						<h5>Messages</h5>
+						<div
+							ref={messagesDiv}
+							style={{
+								flexGrow: 1,
+							}}
+						>
+							<List
+								style={{
+									maxHeight: messagesDiv.current
+										? messagesDiv.current.clientHeight
+										: 0,
+									overflowY: "auto",
+								}}
+							>
+								{messages.map((message, pos) => (
+									<ListItem key={pos}>
+										<ListItemText primary={message} />
+									</ListItem>
+								))}
+							</List>
+						</div>
+						<form
+							onSubmit={(e) => {
+								e.preventDefault();
+								onSendMessage();
+							}}
+							noValidate
+							autoComplete="off"
+							style={{
+								width: "100%",
+								padding: "8px",
+								display: "flex",
+								flexWrap: "wrap",
+							}}
+						>
+							<InputBase
+								multiline
+								rows="3"
+								value={inpMsg}
+								onChange={(e) => {
+									setinpMsg(e.target.value);
+								}}
+								placeholder="Enter message"
+								inputProps={{ "aria-label": "Enter message" }}
+								style={{
+									padding: "8px",
+									border: "1px grey solid",
+									borderRadius: "4px",
+									width: "100%",
+								}}
+							/>
+							<Button
+								type="submit"
+								variant="contained"
+								color="primary"
+								style={{ margin: "8px 0 0 auto" }}
+								endIcon={<Icon>send</Icon>}
+							>
+								Send
+							</Button>
+						</form>
 					</Box>
 				</Grid>
 			</Grid>
@@ -305,11 +399,7 @@ function App() {
 						></CardHeader>
 						<CardContent>
 							<Paper component="form" elevation={0} onSubmit={handleSubmit}>
-								<IconButton
-									type="submit"
-									className={classes.iconButton}
-									aria-label="search"
-								>
+								<IconButton type="submit" className={classes.iconButton}>
 									<PermIdentityIcon />
 								</IconButton>
 								<InputBase

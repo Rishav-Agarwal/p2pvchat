@@ -18,6 +18,10 @@ io.on("connection", (socket) => {
 		delete users[socket.id];
 	});
 
+	socket.on("message", (data) => {
+		io.to(data.to).emit("message", data.message);
+	});
+
 	socket.on("callUser", (data) => {
 		io.to(data.userToCall).emit("hey", {
 			signal: data.signalData,
@@ -35,11 +39,6 @@ io.on("connection", (socket) => {
 
 	socket.on("cancelCall", (data) => {
 		io.to(data.to).emit("callCancelled");
-	});
-
-	socket.on("endCall", (data) => {
-		io.to(data.to[0]).emit("callEnded");
-		io.to(data.to[1]).emit("callEnded");
 	});
 });
 
