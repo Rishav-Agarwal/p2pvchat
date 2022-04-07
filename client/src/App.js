@@ -279,6 +279,8 @@ function App() {
 		socket.current.emit("message", data);
 	};
 
+	console.log("god or what")
+
 	return (
 		<>
 			<Grid
